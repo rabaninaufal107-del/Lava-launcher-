@@ -481,4 +481,4 @@ private fun VersionsContent(
                             }
                         },
                         onClick = {
-                            if (version == version0) return@DropdownMe
+                            if (version == version0) return@DropdownMe            
