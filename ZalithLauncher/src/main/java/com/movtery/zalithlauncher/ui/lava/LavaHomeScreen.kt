@@ -16,11 +16,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.movtery.zalithlauncher.game.version.installed.VersionsManager
 
 private val BgDark = Color(0xFF1E1A19)
 private val SideDark = Color(0xFF2A2423)
 private val PlayGreen = Color(0xFF3C8527)
 private val Lava = Color(0xFFE5521B)
+private val GreenText = Color(0xFF6BE04A)
 
 @Composable
 fun LavaHomeScreen(
@@ -54,7 +57,7 @@ fun LavaHomeScreen(
             )
             Spacer(Modifier.height(4.dp))
             SideItem("Home", selected == "Home") { selected = "Home" }
-            SideItem("Installations", false) { onOpenVersions() }
+            SideItem("Installations", selected == "Installations") { selected = "Installations" }
             SideItem("Skins", selected == "Skins") { selected = "Skins" }
             SideItem("Patch Notes", false) { openLink("https://www.minecraft.net") }
             SideItem("News", selected == "News") { selected = "News" }
@@ -65,6 +68,8 @@ fun LavaHomeScreen(
         // Konten utama
         if (selected == "News") {
             LavaNewsScreen(Modifier.weight(1f).fillMaxHeight(), openLink)
+        } else if (selected == "Installations") {
+            LavaInstallationsScreen(Modifier.weight(1f).fillMaxHeight(), onOpenVersions)
         } else if (selected == "Skins") {
             LavaSkinsScreen(Modifier.weight(1f).fillMaxHeight(), onOpenAccounts)
         } else Column(Modifier.weight(1f).fillMaxHeight().padding(12.dp)) {
@@ -103,8 +108,12 @@ fun LavaHomeScreen(
             Spacer(Modifier.height(8.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SourceCard("CurseForge", Modifier.weight(1f))
-                SourceCard("Modrinth", Modifier.weight(1f))
+                SourceCard("CurseForge", Modifier.weight(1f)) {
+                    openLink("https://www.curseforge.com/minecraft/mc-mods")
+                }
+                SourceCard("Modrinth", Modifier.weight(1f)) {
+                    openLink("https://modrinth.com/mods")
+                }
             }
         }
     }
@@ -112,18 +121,68 @@ fun LavaHomeScreen(
 
 @Composable
 private fun PlayBar(onPlay: () -> Unit) {
+    val versions by VersionsManager.versions.collectAsStateWithLifecycle()
+    val current by VersionsManager.currentVersion.collectAsStateWithLifecycle()
+    var expanded by remember { mutableStateOf(false) }
+    val label = current?.getVersionName() ?: "Pilih versi dulu"
+
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Row(Modifier.clip(RoundedCornerShape(4.dp))) {
-            Box(
-                Modifier.background(PlayGreen).clickable(onClick = onPlay)
-                    .padding(horizontal = 36.dp, vertical = 10.dp)
+        Box {
+            Row(
+                Modifier.clip(RoundedCornerShape(4.dp)).height(IntrinsicSize.Min)
             ) {
-                Text("PLAY JAVA", color = Color.White, fontWeight = FontWeight.Bold)
+                Column(
+                    Modifier.background(PlayGreen)
+                        .clickable { if (current == null) expanded = true else onPlay() }
+                        .padding(horizontal = 28.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("▶ PLAY JAVA", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(
+                        label,
+                        color = Color(0xFFD8F0CC),
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Box(
+                    Modifier.fillMaxHeight()
+                        .background(Color(0xFF2F6B24))
+                        .clickable { expanded = true }
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("▼", color = Color.White, fontSize = 12.sp)
+                }
             }
-            Box(
-                Modifier.background(Color(0xFF2F6B24)).padding(horizontal = 12.dp, vertical = 10.dp)
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(SideDark)
             ) {
-                Text("▼", color = Color.White, fontSize = 12.sp)
+                if (versions.isEmpty()) {
+                    DropdownMenuItem(
+                        text = { Text("Belum ada game terpasang", color = Color(0xFFBBB0AC)) },
+                        onClick = { expanded = false }
+                    )
+                }
+                versions.forEach { v ->
+                    val active = v == current
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                (if (active) "✓ " else "") + v.getVersionName(),
+                                color = if (active) GreenText else Color.White,
+                                fontWeight = if (active) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        onClick = {
+                            if (!active) VersionsManager.saveVersion(v)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -201,9 +260,10 @@ private fun SideItem(text: String, active: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SourceCard(name: String, modifier: Modifier = Modifier) {
+private fun SourceCard(name: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
-        modifier.height(48.dp).clip(RoundedCornerShape(6.dp)).background(SideDark),
+        modifier.height(48.dp).clip(RoundedCornerShape(6.dp)).background(SideDark)
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(name, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
